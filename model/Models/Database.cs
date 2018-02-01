@@ -69,6 +69,7 @@ namespace SchemaZen.Library.Models {
 		public string Dir { get; set; } = "";
 		public List<ForeignKey> ForeignKeys { get; set; } = new List<ForeignKey>();
 		public string Name { get; set; }
+		public bool RenameUniqueConstraints { get; set; } = false;
 
 		public List<DbProp> Props { get; set; } = new List<DbProp>();
 		public List<Routine> Routines { get; set; } = new List<Routine>();
@@ -625,6 +626,8 @@ order by fk.name, fkc.constraint_column_id
 					var schemaName = (string)dr["schemaName"];
 					var tableName = (string)dr["tableName"];
 					var indexName = (string)dr["indexName"];
+					if (RenameUniqueConstraints)
+						indexName = RemoveUniqueness(indexName);
 					var isView = (string)dr["baseType"] == "V";
 
 					var t = isView
@@ -660,6 +663,16 @@ order by fk.name, fkc.constraint_column_id
 						c.Type = "UNIQUE";
 				}
 			}
+		}
+
+		private string RemoveUniqueness(string input)
+		{
+			// Remove random part of key so comparisons work properly:
+			// e.g. PK__Standard__DAB2C6DCDE6DB280 to PK__Standard__GUIDREPLACEDHERE
+			if (input.Count(c => c == '_') == 4)
+				return input.Substring(0, input.LastIndexOf("_")) + "_GUIDREPLACEDHERE";
+			else
+				return input;
 		}
 
 		private void LoadColumnComputes(SqlCommand cm) {

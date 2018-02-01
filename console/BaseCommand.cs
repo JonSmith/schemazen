@@ -29,6 +29,10 @@ namespace SchemaZen.console {
 				"f|databaseFilesPath=",
 				"Path to database data and log files.",
 				o => DatabaseFilesPath = o);
+			HasOption(
+				"r|renameUniqueConstraints",
+				"Rename constraints with a GUID suffix to make comparisons easier.",
+				o => RenameUniqueConstraints = o != null);
 		}
 
 		protected string Server { get; set; }
@@ -40,5 +44,6 @@ namespace SchemaZen.console {
 		protected bool Overwrite { get; set; }
 		protected bool Verbose { get; set; }
 		protected string DatabaseFilesPath { get; set; }
+		protected bool RenameUniqueConstraints { get; set; }
 	}
 }
