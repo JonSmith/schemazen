@@ -153,10 +153,25 @@ end
 			return text.ToString();
 		}
 
-		public string ScriptPKRename()
+		public IEnumerable<string> ScriptConstraintRename()
+		{
+			List<string> scripts = new List<string>();
+
+			if (IsType || Owner == "dbo")	// we don't want to rename built in constraints - such as from sysdiagrams
+				return scripts;
+
+			var pk = ScriptPKRename();
+			if (!string.IsNullOrEmpty(pk))
+				scripts.Add(pk);
+
+			scripts.AddRange(ScriptUniqueConstraintRename());
+
+			return scripts;
+		}
+		private string ScriptPKRename()
 		{
 			var pk = _constraints.FirstOrDefault(c => c.Type == "PRIMARY KEY");
-			if (IsType || pk == null)
+			if (pk == null)
 				return string.Empty;
 
 			string oldName = pk.Name;
@@ -167,6 +182,28 @@ end
 
 			string s = $"sp_rename '{Owner}.{oldName}', '{newName}'";
 			return s;
+		}
+
+		private IEnumerable<string> ScriptUniqueConstraintRename()
+		{
+			List<string> scripts = new List<string>();
+
+			foreach (var uq in _constraints.Where(c => c.Type == "UNIQUE"))
+			{
+				string columns = string.Join("_", uq.Columns.Select(c => c.ColumnName.Replace("_", "")).ToArray());
+				string oldName = uq.Name;
+				string newName = new StringBuilder()
+					.Append("UQ_")
+					.Append(Name.Replace("_", ""))
+					.Append("_")
+					.Append(columns)
+					.ToString();
+
+				if (oldName != newName)
+					scripts.Add($"sp_rename '{Owner}.{oldName}', '{newName}'");
+			}
+
+			return scripts;
 		}
 
 		public string ScriptDrop() {

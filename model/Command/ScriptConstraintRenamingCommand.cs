@@ -1,6 +1,7 @@
 ﻿using SchemaZen.Library.Models;
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace SchemaZen.Library.Command
@@ -33,13 +34,17 @@ namespace SchemaZen.Library.Command
 		{
 			var sb = new StringBuilder();
 
-			foreach (var table in db.Tables)
+			foreach (var table in db.Tables.OrderBy(t => t.Owner).ThenBy(t => t.Name))
 			{
-				var renameScript = table.ScriptPKRename();
-				if (!string.IsNullOrEmpty(renameScript))
+				var renameScripts = table.ScriptConstraintRename();
+				if (renameScripts.Any())
 				{
-					sb.AppendLine(table.ScriptPKRename());
-					sb.AppendLine("GO");
+					// a GO line is needed between each rename
+					foreach (var script in renameScripts)
+					{
+						sb.AppendLine(script);
+						sb.AppendLine("GO");
+					}
 				}
 			}
 
