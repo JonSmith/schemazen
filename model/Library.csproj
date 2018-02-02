@@ -53,6 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Command\BaseCommand.cs" />
+    <Compile Include="Command\ScriptConstraintRenamingCommand.cs" />
     <Compile Include="ILogger.cs" />
     <Compile Include="Command\CreateCommand.cs" />
     <Compile Include="Command\CompareCommand.cs" />

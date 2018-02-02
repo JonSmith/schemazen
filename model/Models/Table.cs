@@ -153,6 +153,22 @@ end
 			return text.ToString();
 		}
 
+		public string ScriptPKRename()
+		{
+			var pk = _constraints.FirstOrDefault(c => c.Type == "PRIMARY KEY");
+			if (IsType || pk == null)
+				return string.Empty;
+
+			string oldName = pk.Name;
+			string newName = "PK_" + Name.Replace("_", "");
+
+			if (oldName == newName)
+				return string.Empty;
+
+			string s = $"sp_rename '{Owner}.{oldName}', '{newName}'";
+			return s;
+		}
+
 		public string ScriptDrop() {
 			return $"DROP {(IsType ? "TYPE" : "TABLE")} [{Owner}].[{Name}]";
 		}
