@@ -33,6 +33,10 @@ namespace SchemaZen.console {
 				"r|renameUniqueConstraints",
 				"Rename constraints with a GUID suffix to make comparisons easier.",
 				o => RenameUniqueConstraints = o != null);
+			HasOption(
+				"sc|stripComments",
+				"Strip comments from view/function definitions.",
+				o => StripComments = o != null);
 		}
 
 		protected string Server { get; set; }
@@ -45,5 +49,6 @@ namespace SchemaZen.console {
 		protected bool Verbose { get; set; }
 		protected string DatabaseFilesPath { get; set; }
 		protected bool RenameUniqueConstraints { get; set; }
+		protected bool StripComments { get; set; }
 	}
 }

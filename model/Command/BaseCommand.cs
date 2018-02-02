@@ -14,6 +14,7 @@ namespace SchemaZen.Library.Command {
 		public ILogger Logger { get; set; }
 		public bool Overwrite { get; set; }
 		public bool RenameUniqueConstraints { get; set; } = false;
+		public bool StripComments { get; set; } = false;
 
 		public Database CreateDatabase(IList<string> filteredTypes = null) {
 			filteredTypes = filteredTypes ?? new List<string>();
@@ -28,7 +29,8 @@ namespace SchemaZen.Library.Command {
 				return new Database(filteredTypes) {
 					Connection = ConnectionString,
 					Dir = ScriptDir,
-					RenameUniqueConstraints = RenameUniqueConstraints
+					RenameUniqueConstraints = RenameUniqueConstraints,
+					StripComments = StripComments
 				};
 			}
 			if (string.IsNullOrEmpty(Server) || string.IsNullOrEmpty(DbName)) {
@@ -50,7 +52,8 @@ namespace SchemaZen.Library.Command {
 			return new Database(filteredTypes) {
 				Connection = builder.ToString(),
 				Dir = ScriptDir,
-				RenameUniqueConstraints = RenameUniqueConstraints
+				RenameUniqueConstraints = RenameUniqueConstraints,
+				StripComments = StripComments
 			};
 		}
 

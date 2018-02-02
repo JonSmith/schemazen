@@ -59,7 +59,8 @@ namespace SchemaZen.console {
 				User = User,
 				Logger = _logger,
 				Overwrite = Overwrite,
-				RenameUniqueConstraints = RenameUniqueConstraints
+				RenameUniqueConstraints = RenameUniqueConstraints,
+				StripComments = StripComments
 			};
 
 			var filteredTypes = HandleFilteredTypes();

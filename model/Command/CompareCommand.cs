@@ -13,8 +13,8 @@ namespace SchemaZen.Library.Command {
 		public string OutDiff { get; set; }
 
 		public bool Execute() {
-			var sourceDb = new Database() { RenameUniqueConstraints = RenameUniqueConstraints };
-			var targetDb = new Database() { RenameUniqueConstraints = RenameUniqueConstraints };
+			var sourceDb = new Database() { RenameUniqueConstraints = RenameUniqueConstraints, StripComments = StripComments };
+			var targetDb = new Database() { RenameUniqueConstraints = RenameUniqueConstraints, StripComments = StripComments };
 			sourceDb.Connection = Source;
 			targetDb.Connection = Target;
 			sourceDb.Load();

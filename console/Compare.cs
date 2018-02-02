@@ -12,6 +12,7 @@ namespace SchemaZen.console {
 		private bool _overwrite;
 		private bool _verbose;
 		private bool _renameUniqueConstraints;
+		private bool _stripComments;
 
 		public Compare() {
 			IsCommand("Compare", "CreateDiff two databases.");
@@ -41,6 +42,10 @@ namespace SchemaZen.console {
 				"r|renameUniqueConstraints",
 				"Rename constraints with a GUID suffix to make comparisons easier.",
 				o => _renameUniqueConstraints = o != null);
+			HasOption(
+				"sc|stripComments",
+				"Strip comments from view/function definitions.",
+				o => _stripComments = o != null);
 		}
 
 		public override int Run(string[] remainingArguments) {
@@ -60,7 +65,8 @@ namespace SchemaZen.console {
 				Verbose = _verbose,
 				OutDiff = _outDiff,
 				Overwrite = _overwrite,
-				RenameUniqueConstraints = _renameUniqueConstraints
+				RenameUniqueConstraints = _renameUniqueConstraints,
+				StripComments = _stripComments
 			};
 
 			try {
