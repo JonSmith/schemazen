@@ -11,7 +11,6 @@ namespace SchemaZen.console
 		private string _source;
 		private string _outFile;
 		private bool _overwrite;
-		private bool _verbose;
 
 		public ScriptConstraintRename()
 		{
