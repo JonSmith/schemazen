@@ -372,6 +372,82 @@ from #ScriptedRoles
 			} catch (SqlException) {
 				// SQL server version (i.e. Azure) doesn't support logins, nothing to do here
 			}
+
+			// get object permissions
+			cm.CommandText = @"SELECT
+									perm.state, perm.state_desc,
+									perm.permission_name,
+									OBJECT_SCHEMA_NAME(perm.major_id) AS object_schema,
+									OBJECT_NAME(perm.major_id) AS object_name,
+									CASE
+										WHEN cl.column_id IS NULL THEN SPACE(0)
+										ELSE '(' + QUOTENAME(cl.name) + ')'
+									END AS column_name,
+									USER_NAME(usr.principal_id) COLLATE database_default AS name
+								FROM   
+									sys.database_permissions AS perm
+									INNER JOIN
+									sys.database_principals AS usr
+									ON perm.grantee_principal_id = usr.principal_id
+									LEFT JOIN
+									sys.columns AS cl
+									ON cl.column_id = perm.minor_id AND cl.[object_id] = perm.major_id
+								WHERE /* Include System objects when scripting permissions for master, exclude elsewhere */
+									(DB_NAME() <> 'master' AND perm.major_id IN (SELECT [object_id] FROM sys.objects WHERE type NOT IN ('S'))
+									OR DB_NAME() =  'master'
+									)";
+			using (var dr = cm.ExecuteReader())
+			{
+				while (dr.Read())
+				{
+					u = FindUser((string)dr["name"]);
+					if (u != null)
+						u.ObjectPermissions.Add(new ObjectPermission()
+						{
+							State = dr["state"] as string,
+							StateDescription = dr["state_desc"] as string,
+							PermissionName = dr["permission_name"] as string,
+							ObjectSchema = dr["object_schema"] as string,
+							ObjectName = dr["object_name"] as string,
+							ColumnName = dr["column_name"] as string
+						});
+				}
+			}
+
+			// get database permissions
+			cm.CommandText = @"SELECT
+								perm.state, perm.state_desc,
+								perm.permission_name,
+								USER_NAME(usr.principal_id) COLLATE database_default as name
+							FROM   sys.database_permissions AS perm
+							   INNER JOIN
+							   sys.database_principals AS usr
+							   ON perm.grantee_principal_id = usr.principal_id
+							WHERE   [perm].[major_id] = 0
+							   AND [usr].[principal_id] > 4 -- 0 to 4 are system users/schemas
+							   AND [usr].[type] IN ('G', 'S', 'U') -- S = SQL user, U = Windows user, G = Windows group";
+			using (var dr = cm.ExecuteReader())
+			{
+				while (dr.Read())
+				{
+					u = FindUser((string)dr["name"]);
+					if (u != null)
+						u.DatabasePermissions.Add(new DatabasePermission()
+						{
+							State = dr["state"] as string,
+							StateDescription = dr["state_desc"] as string,
+							PermissionName = dr["permission_name"] as string
+						});
+				}
+			}
+
+			// TODO: does not handle the following - neither of which I have example databases for:
+			// 1. Type level permissions
+			// 2. DB level schema permissions
+
+			// sort the permissions into a sensible order
+			foreach (var user in Users)
+				user.SortPermissions();
 		}
 
 		private void LoadCLRAssemblies(SqlCommand cm) {
