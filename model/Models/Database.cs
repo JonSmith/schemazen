@@ -74,6 +74,7 @@ namespace SchemaZen.Library.Models {
 
 		public List<DbProp> Props { get; set; } = new List<DbProp>();
 		public List<Routine> Routines { get; set; } = new List<Routine>();
+		public List<SecurityPolicy> SecurityPolicies { get; set; } = new List<SecurityPolicy>();
 		public List<Schema> Schemas { get; set; } = new List<Schema>();
 		public List<Synonym> Synonyms { get; set; } = new List<Synonym>();
 		public List<Table> TableTypes { get; set; } = new List<Table>();
@@ -107,6 +108,11 @@ namespace SchemaZen.Library.Models {
 			return Routines.FirstOrDefault(r => r.Name == name && r.Owner == schema);
 		}
 
+		public SecurityPolicy FindSecurityPolicy(string name)
+		{
+			return SecurityPolicies.FirstOrDefault(sp => sp.Name == name);
+		}
+
 		public SqlAssembly FindAssembly(string name) {
 			return Assemblies.FirstOrDefault(a => a.Name == name);
 		}
@@ -138,7 +144,7 @@ namespace SchemaZen.Library.Models {
 
 		private static readonly HashSet<string> _dirs = new HashSet<string> {
 			"user_defined_types", "tables", "foreign_keys", "assemblies", "functions", "procedures", "triggers",
-			"views", "xmlschemacollections", "data", "roles", "users", "synonyms", "table_types"
+			"views", "security_policies", "xmlschemacollections", "data", "roles", "users", "synonyms", "table_types"
 		};
 
 		public static HashSet<string> Dirs => _dirs;
@@ -165,6 +171,7 @@ namespace SchemaZen.Library.Models {
 			Tables.Clear();
 			TableTypes.Clear();
 			Routines.Clear();
+			SecurityPolicies.Clear();
 			ForeignKeys.Clear();
 			DataTables.Clear();
 			ViewIndexes.Clear();
@@ -188,6 +195,7 @@ namespace SchemaZen.Library.Models {
 					LoadCheckConstraints(cm);
 					LoadForeignKeys(cm);
 					LoadRoutines(cm);
+					LoadSecurityPolicies(cm);
 					LoadXmlSchemas(cm);
 					LoadCLRAssemblies(cm);
 					LoadUsersAndLogins(cm);
@@ -549,6 +557,36 @@ from #ScriptedRoles
 							r.RoutineType = Routine.RoutineKind.View;
 							break;
 					}
+				}
+			}
+		}
+
+		private void LoadSecurityPolicies(SqlCommand cm)
+		{
+			// get policies
+			cm.CommandText = @"SELECT
+					pol.name as name,
+					OBJECT_SCHEMA_NAME(pred.target_object_id) as tableSchema,
+					OBJECT_NAME(pred.target_object_id) as tableName,
+					pred.predicate_type_desc as predicateType,
+					pred.predicate_definition as predicateDefinition,
+					pol.is_enabled as isEnabled,
+					pol.is_schema_bound as isSchemaBound
+					FROM sys.security_predicates pred
+					JOIN sys.security_policies pol ON pol.object_id = pred.object_id";
+
+			using (var dr = cm.ExecuteReader())
+			{
+				while (dr.Read())
+				{
+					SecurityPolicies.Add(new SecurityPolicy(
+						(string)dr["name"],
+						(string)dr["tableSchema"],
+						(string)dr["tableName"],
+						(string)dr["predicateType"],
+						(string)dr["predicateDefinition"],
+						Convert.ToBoolean(dr["isEnabled"]),
+						Convert.ToBoolean(dr["isSchemaBound"])));
 				}
 			}
 		}
@@ -1144,6 +1182,28 @@ where name = @dbname
 				diff.RoutinesDeleted.Add(r);
 			}
 
+			//get security policies added and changed
+			foreach (var sp in SecurityPolicies)
+			{
+				var sp2 = FindSecurityPolicy(sp.Name);
+				if (sp2 == null)
+				{
+					diff.SecurityPoliciesAdded.Add(sp);
+				}
+				else
+				{
+					if (sp.ScriptCreate() != sp2.ScriptCreate())
+					{
+						diff.SecurityPoliciesDiff.Add(sp);
+					}
+				}
+			}
+			//get security policies deleted
+			foreach (var sp in db.SecurityPolicies.Where(sp => FindSecurityPolicy(sp.Name) == null))
+			{
+				diff.SecurityPoliciesDeleted.Add(sp);
+			}
+
 			//get added and compare mutual foreign keys
 			foreach (var fk in ForeignKeys) {
 				var fk2 = db.FindForeignKey(fk.Name, fk.Table.Owner);
@@ -1270,6 +1330,13 @@ where name = @dbname
 				text.AppendLine("GO");
 			}
 
+			foreach (var sp in SecurityPolicies.OrderBy(sp => sp.Name))
+			{
+				text.AppendLine(sp.ScriptCreate());
+				text.AppendLine();
+				text.AppendLine("GO");
+			}
+
 			foreach (var a in Assemblies) {
 				text.AppendLine(a.ScriptCreate());
 				text.AppendLine();
@@ -1326,6 +1393,7 @@ where name = @dbname
 				var dir = routineType.Key.ToString().ToLower() + "s";
 				WriteScriptDir(dir, routineType.ToArray(), log);
 			}
+			WriteScriptDir("security_policies", SecurityPolicies.ToArray(), log);
 			WriteScriptDir("views", ViewIndexes.ToArray(), log);
 			WriteScriptDir("assemblies", Assemblies.ToArray(), log);
 			WriteScriptDir("roles", Roles.ToArray(), log);
@@ -1616,6 +1684,9 @@ where name = @dbname
 		public List<Routine> RoutinesAdded = new List<Routine>();
 		public List<Routine> RoutinesDeleted = new List<Routine>();
 		public List<Routine> RoutinesDiff = new List<Routine>();
+		public List<SecurityPolicy> SecurityPoliciesAdded = new List<SecurityPolicy>();
+		public List<SecurityPolicy> SecurityPoliciesDeleted = new List<SecurityPolicy>();
+		public List<SecurityPolicy> SecurityPoliciesDiff = new List<SecurityPolicy>();
 		public List<Synonym> SynonymsAdded = new List<Synonym>();
 		public List<Synonym> SynonymsDeleted = new List<Synonym>();
 		public List<Synonym> SynonymsDiff = new List<Synonym>();
@@ -1638,6 +1709,9 @@ where name = @dbname
 							  || RoutinesAdded.Count > 0
 							  || RoutinesDiff.Count > 0
 							  || RoutinesDeleted.Count > 0
+							  || SecurityPoliciesAdded.Count > 0
+							  || SecurityPoliciesDiff.Count > 0
+							  || SecurityPoliciesDeleted.Count > 0
 							  || ForeignKeysAdded.Count > 0
 							  || ForeignKeysDiff.Count > 0
 							  || ForeignKeysDeleted.Count > 0
@@ -1653,6 +1727,7 @@ where name = @dbname
 							  || SynonymsAdded.Count > 0
 							  || SynonymsDiff.Count > 0
 							  || SynonymsDeleted.Count > 0;
+
 
 		private static string Summarize(bool includeNames, List<string> changes, string caption) {
 			if (changes.Count == 0) return string.Empty;
@@ -1682,6 +1757,11 @@ where name = @dbname
 			sb.Append(Summarize(includeNames,
 				RoutinesDiff.Select(o => $"{o.RoutineType.ToString()} {o.Owner}.{o.Name}").ToList(),
 				"routines altered"));
+			sb.Append(Summarize(includeNames, SecurityPoliciesAdded.Select(o => o.Name).ToList(),
+				"security policies in source but not in target"));
+			sb.Append(Summarize(includeNames, SecurityPoliciesDeleted.Select(o => o.Name).ToList(),
+				"security policies not in source but in target"));
+			sb.Append(Summarize(includeNames, SecurityPoliciesDiff.Select(o => o.Name).ToList(), "security policies altered"));
 			sb.Append(Summarize(includeNames,
 				TablesAdded.Where(o => !o.IsType).Select(o => $"{o.Owner}.{o.Name}").ToList(),
 				"tables in source but not in target"));
@@ -1712,6 +1792,7 @@ where name = @dbname
 				"synonyms not in source but in target"));
 			sb.Append(Summarize(includeNames, SynonymsDiff.Select(o => $"{o.Owner}.{o.Name}").ToList(),
 				"synonyms altered"));
+
 			return sb.ToString();
 		}
 
@@ -1724,6 +1805,21 @@ where name = @dbname
 				text.Append(Database.ScriptPropList(PropsChanged));
 				text.AppendLine("GO");
 				text.AppendLine();
+			}
+
+			//delete security policies
+			if (SecurityPoliciesDeleted.Count + SecurityPoliciesDiff.Count > 0)
+			{
+				foreach (var sp in SecurityPoliciesDeleted)
+				{
+					text.AppendLine(sp.ScriptDrop());
+				}
+				//delete modified security policies
+				foreach (var sp in SecurityPoliciesDiff)
+				{
+					text.AppendLine(sp.ScriptDrop());
+				}
+				text.AppendLine("GO");
 			}
 
 			//delete foreign keys
@@ -1795,6 +1891,25 @@ where name = @dbname
 			}
 			foreach (var r in RoutinesDeleted) {
 				text.AppendLine(r.ScriptDrop());
+				text.AppendLine("GO");
+			}
+
+			//add security policies
+			foreach (var sp in SecurityPoliciesAdded)
+			{
+				text.AppendLine(sp.ScriptCreate());
+				text.AppendLine("GO");
+			}
+			foreach (var sp in SecurityPoliciesDiff)
+			{
+				text.AppendLine(sp.ScriptDrop());
+				text.AppendLine("GO");
+				text.AppendLine(sp.ScriptCreate());
+				text.AppendLine("GO");
+			}
+			foreach (var sp in SecurityPoliciesDeleted)
+			{
+				text.AppendLine(sp.ScriptDrop());
 				text.AppendLine("GO");
 			}
 
